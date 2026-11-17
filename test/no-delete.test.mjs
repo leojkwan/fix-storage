@@ -70,7 +70,7 @@ export function violationsIn(name, contents) {
   }
   for (const match of contents.matchAll(PROCESS_CALL)) {
     if (!PROGRAMS.has(match[2])) found.push(`${name} starts ${match[2]} with ${match[1]}()`);
-    if (match[2] === '"bash"' && (name !== "src/core/diskclean.ts" || !contents.includes(BASH_CALL)))
+    if (match[2] === '"bash"' && (name !== "src/core/diskclean.ts" || !contents.startsWith(BASH_CALL, match.index)))
       found.push(`${name} starts bash for something other than the doctor`);
   }
   return found;
@@ -97,6 +97,7 @@ test("the guard catches the spellings a denylist misses", () => {
     ['const { execSync } = require("child_process");', "src/main.tsx"],
     ['import { spawn } from "node:child_process";\nspawn("bash", ["-c", command]);', "src/core/diskclean.ts"],
     ['import { spawn } from "node:child_process";\nspawn("bash", [script, "--json"]);', "src/core/scan.ts"],
+    ['spawn("bash", [script, "--json"]);\nspawn("bash", ["-c", "touch x"]);', "src/core/diskclean.ts"],
   ];
   for (const [contents, name] of bad) {
     assert.notDeepEqual(violationsIn(name, contents), [], `not caught: ${contents}`);

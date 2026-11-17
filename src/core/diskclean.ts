@@ -121,11 +121,13 @@ export function parseDoctor(stdout: string, exitCode: number | null): Loaded<Doc
   if (r.schema !== DOCTOR_SCHEMA) return { ok: false, reason: `doctor schema is ${JSON.stringify(r.schema)}, expected ${DOCTOR_SCHEMA}` };
   const f = r.free as Record<string, unknown> | undefined;
   if (!f || !num(f.gib) || !num(f.floor_gib) || !num(f.target_gib)) return { ok: false, reason: "doctor output has no free-space reading" };
+  if (f.gib < 0 || f.floor_gib < 0 || f.target_gib < 0) return { ok: false, reason: "doctor free-space reading is negative" };
   if (!Array.isArray(r.producers)) return { ok: false, reason: "doctor output has no producer list" };
 
-  const producers: Producer[] = r.producers
-    .filter((p): p is Record<string, unknown> => !!p && typeof p === "object")
-    .map((p) => ({
+  // One bad row makes the whole reading unknown: dropping it could hide a failure.
+  if (!r.producers.every((p) => !!p && typeof p === "object" && !Array.isArray(p)))
+    return { ok: false, reason: "doctor producer list has an entry that is not an object" };
+  const producers: Producer[] = (r.producers as Record<string, unknown>[]).map((p) => ({
       id: str(p.id),
       name: str(p.name, str(p.id, "unnamed")),
       kind: oneOf(p.kind, KINDS, "count"),
@@ -136,10 +138,11 @@ export function parseDoctor(stdout: string, exitCode: number | null): Loaded<Doc
       ticket: str(p.ticket),
       route: oneOf(p.route, ROUTES, "owner"),
       fix: str(p.fix),
-    }));
+  }));
   const count = (s: ProducerState) => producers.filter((p) => p.state === s).length;
-  const failing = num(r.failing) ? r.failing : count("fail");
-  const unknown = num(r.unknown) ? r.unknown : count("unknown");
+  // Counted from the rows, never taken from the doctor's own totals: if the two disagree, the rows win.
+  const failing = count("fail");
+  const unknown = count("unknown");
   return {
     ok: true,
     value: {
@@ -239,8 +242,11 @@ export function parseReapReceipt(id: string, text: string): Receipt {
   if (Array.isArray(r.stranded) && r.stranded.length > 0) bump(counts, "stranded", r.stranded.length);
 
   // Freed space is what df saw between the start and the end of an execute run. A plan frees nothing.
+  // Only a run that finished and was not refused may claim it: df also moves for other writers.
+  const state = str(r.state, "unknown") || "unknown";
+  const refusal = typeof r.refusal === "string" && r.refusal ? r.refusal : null;
   let freedBytes: number | null = null;
-  if (mode === "execute") {
+  if (mode === "execute" && state === "complete" && refusal === null) {
     if (num(r.free_start_bytes) && num(r.free_end_bytes)) freedBytes = r.free_end_bytes - r.free_start_bytes;
     else if (num(r.freed_total_bytes)) freedBytes = r.freed_total_bytes;
   }
@@ -249,8 +255,8 @@ export function parseReapReceipt(id: string, text: string): Receipt {
     tool: str(r.tool, "build-output-reap") || "build-output-reap",
     mode,
     at: isoMs(r.finished_at) ?? isoMs(r.started_at),
-    state: str(r.state, "unknown") || "unknown",
-    refusal: typeof r.refusal === "string" && r.refusal ? r.refusal : null,
+    state,
+    refusal,
     freedBytes,
     counts,
   };
@@ -282,14 +288,16 @@ export function parseWorktreeReceipt(id: string, text: string): Receipt {
 
   const delta = total ? Number(total[4]) : NaN;
   const totalTime = total ? Number(total[0]) * 1000 : NaN;
+  const state = total ? (total[2] || "unrecorded").toLowerCase() : "incomplete";
   return {
     id,
     tool: "worktree",
     mode: "execute",
     at: Number.isFinite(totalTime) ? totalTime : lastTime,
-    state: total ? (total[2] || "done").toLowerCase() : "incomplete",
+    state,
     refusal: null,
-    freedBytes: total && total[4] !== undefined && total[4] !== "" && Number.isFinite(delta) ? delta : null,
+    // Only a TOTAL row marked DONE claims a df change.
+    freedBytes: state === "done" && total && total[4] !== undefined && total[4] !== "" && Number.isFinite(delta) ? delta : null,
     counts,
   };
 }

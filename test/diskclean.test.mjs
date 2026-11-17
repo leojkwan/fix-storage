@@ -85,10 +85,10 @@ test("a plan receipt never contributes freed bytes", async () => {
 
   const refused = result.value.find((r) => r.refusal);
   assert.equal(refused.state, "lock-timeout");
-  assert.equal(refused.freedBytes, -10_000_000, "negative df deltas are kept, not clamped");
+  assert.equal(refused.freedBytes, null, "a refused run claims no df change, in either direction");
 
-  // Two reap executes and one finished worktree run; the plan adds nothing.
-  assert.equal(dc.freedTotal(result.value), 2_000_000_000 - 10_000_000 + 1_500_000_000);
+  // One finished reap and one finished worktree run; the plan and the refused run add nothing.
+  assert.equal(dc.freedTotal(result.value), 2_000_000_000 + 1_500_000_000);
 
   const json = JSON.parse(view.summaryJson({ doctor: { ok: false, reason: "x" }, receipts: result }));
   for (const r of json.receipts) if (r.mode === "plan") assert.equal(r.freed_df_bytes, null);
@@ -128,4 +128,29 @@ test("--demo --plain runs no du and shows the totals line", () => {
   assert.match(out, /GiB free · floor \d+ · target \d+ · gap /);
   assert.match(out, /plan only, not proof/);
   assert.doesNotMatch(out, /Calculating/);
+});
+
+test("a refused or unfinished execute receipt never claims freed bytes", () => {
+  const refused = dc.parseReapReceipt(
+    "build-output-reap-x-execute.json",
+    JSON.stringify({ mode: "execute", state: "lock-timeout", refusal: "busy", free_start_bytes: 1, free_end_bytes: 1001, items: [] }),
+  );
+  assert.equal(refused.freedBytes, null);
+  const unfinished = dc.parseReapReceipt(
+    "build-output-reap-y-execute.json",
+    JSON.stringify({ mode: "execute", state: "incomplete", free_start_bytes: 1, free_end_bytes: 1001, items: [] }),
+  );
+  assert.equal(unfinished.freedBytes, null);
+  const tsv = dc.parseWorktreeReceipt("worktree-execute-z", "time\tpath\tresult\tdetail\tdf_delta_bytes\n1\tTOTAL\tINCOMPLETE\tx\t100\n");
+  assert.equal(tsv.freedBytes, null);
+});
+
+test("a doctor whose totals contradict its rows, or with a bad row, is never healthy", () => {
+  const base = { schema: "disk-clean.doctor/1", measured_at: "2026-01-01T00:00:00Z", free: { gib: 10, floor_gib: 5, target_gib: 20 } };
+  const lying = dc.parseDoctor(JSON.stringify({ ...base, producers: [{ id: "a", state: "fail" }], failing: 0, unknown: 0, healthy: true }), 0);
+  assert.equal(lying.ok, true);
+  assert.equal(lying.value.healthy, false);
+  assert.equal(lying.value.failing, 1);
+  assert.equal(dc.parseDoctor(JSON.stringify({ ...base, producers: [null], healthy: true }), 0).ok, false);
+  assert.equal(dc.parseDoctor(JSON.stringify({ ...base, free: { gib: -1, floor_gib: 5, target_gib: 20 }, producers: [], healthy: true }), 0).ok, false);
 });
