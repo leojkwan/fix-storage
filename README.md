@@ -1,9 +1,10 @@
 ## Read-only fork
 
-This fork keeps the upstream interface as a read-only disk viewer. File deletion,
-moving to Trash and category clearing have been removed so a future deletion
-engine can use separately audited executors. The upstream installation links
-below refer to the original project.
+This fork keeps the interface of [govijr/fix-storage](https://github.com/govijr/fix-storage)
+as a read-only disk viewer. File deletion, moving to Trash and category clearing
+have been removed so a future deletion engine can use separately audited
+executors. It has no installer and no releases: run it from source. The upstream
+installer would install the original app, which can delete files.
 
 ### Producers screen
 
@@ -35,18 +36,12 @@ It runs no `du` and no key cleans anything.
 
 **See what is filling your Mac's disk and find the culprit, from the terminal.**
 
-[![CI](https://github.com/govijr/fix-storage/actions/workflows/ci.yml/badge.svg)](https://github.com/govijr/fix-storage/actions/workflows/ci.yml)
-[![Release](https://img.shields.io/github/v/release/govijr/fix-storage?color=4ade80)](https://github.com/govijr/fix-storage/releases)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 ![macOS](https://img.shields.io/badge/platform-macOS-lightgrey)
 
 <img width="3344" height="2160" alt="image" src="https://github.com/user-attachments/assets/bbd9ade2-e996-4e2f-9979-ff73b57738f1" />
 
 </div>
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/govijr/fix-storage/main/install.sh | sh
-```
 
 ---
 
@@ -62,33 +57,15 @@ curl -fsSL https://raw.githubusercontent.com/govijr/fix-storage/main/install.sh 
 ## Install
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/govijr/fix-storage/main/install.sh | sh
+git clone https://github.com/leojkwan/fix-storage && cd fix-storage
+npm install && npm start
 ```
-
-The installer puts the app in `~/.fix-storage` and links the `fix-storage` command into `~/.local/bin`. It needs no `sudo`.
 
 **Requirements**
 
 - macOS (Apple silicon or Intel)
 - Node.js 20.11 or newer (`brew install node`)
 - For the graphical view: a terminal with the kitty graphics protocol, such as [Ghostty](https://ghostty.org), [kitty](https://sw.kovidgoyal.net/kitty/), [WezTerm](https://wezfurlong.org/wezterm/) or iTerm2. Other terminals get a character-only view.
-
-<details>
-<summary>Other install options</summary>
-
-```bash
-# A specific version
-curl -fsSL https://raw.githubusercontent.com/govijr/fix-storage/main/install.sh | sh -s -- --version 0.2.0
-
-# Somewhere else
-curl -fsSL https://raw.githubusercontent.com/govijr/fix-storage/main/install.sh | FIX_STORAGE_HOME=~/apps/fix-storage FIX_STORAGE_BIN=~/bin sh
-
-# From source
-git clone https://github.com/govijr/fix-storage && cd fix-storage
-npm install && npm start
-```
-
-</details>
 
 ## Usage
 
@@ -137,16 +114,10 @@ The rules live in [`src/core/classify.ts`](src/core/classify.ts). They are delib
 
 For a folder, fix-storage runs one `du` pass over it, then follows the biggest child down for as long as that child holds more than half of its parent. It stops at things that are one unit to you, like `node_modules`, `.app` bundles or a Photos library, and ends at a single file if one file is most of the folder. When no one thing dominates, it shows the three biggest instead. Sizes measured along the way are reused, so opening those folders afterwards is instant.
 
-## Uninstall
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/govijr/fix-storage/main/install.sh | sh -s -- --uninstall
-```
-
 ## Development
 
 ```bash
-git clone https://github.com/govijr/fix-storage && cd fix-storage
+git clone https://github.com/leojkwan/fix-storage && cd fix-storage
 npm install
 npm run demo        # build and open the demo disk
 npm run typecheck

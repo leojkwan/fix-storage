@@ -15,13 +15,13 @@
     "du",
     "node_modules"
   ],
-  "homepage": "https://github.com/govijr/fix-storage#readme",
+  "homepage": "https://github.com/leojkwan/fix-storage#readme",
   "bugs": {
-    "url": "https://github.com/govijr/fix-storage/issues"
+    "url": "https://github.com/leojkwan/fix-storage/issues"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/govijr/fix-storage.git"
+    "url": "git+https://github.com/leojkwan/fix-storage.git"
   },
   "license": "MIT",
   "author": "the fix-storage authors",

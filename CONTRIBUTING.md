@@ -1,11 +1,13 @@
 # Contributing to fix-storage
 
+> This fork is read-only: it does not delete, move or clear anything. Text below that describes removal applies to the upstream project only.
+
 Thanks for helping. fix-storage deletes things on people's disks, so the bar for anything that removes files is high, and the bar for everything else is low.
 
 ## Getting set up
 
 ```bash
-git clone https://github.com/govijr/fix-storage && cd fix-storage
+git clone https://github.com/leojkwan/fix-storage && cd fix-storage
 npm install
 npm run demo       # made-up disk, deletes nothing
 npm run typecheck
