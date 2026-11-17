@@ -1,0 +1,19 @@
+{
+  "schema": "disk-clean.reap/1",
+  "tool": "build-output-reap",
+  "mode": "execute",
+  "state": "complete",
+  "refusal": null,
+  "started_at": "2026-01-01T11:00:00Z",
+  "finished_at": "2026-01-01T11:01:00Z",
+  "free_start_bytes": 10000000000,
+  "free_end_bytes": 12000000000,
+  "freed_total_bytes": 2000000000,
+  "items": [
+    { "name": "fixture-a", "decision": "removed" },
+    { "name": "fixture-b", "decision": "removed" },
+    { "name": "fixture-c", "decision": "kept-busy" }
+  ],
+  "kept_counts": {},
+  "stranded": []
+}

@@ -122,8 +122,7 @@ export function classify(item: Item, category: CategoryId, usage?: Usage, now: n
   if (path.includes("/Xcode/Archives/")) return { verdict: "unused", reason: `old app archive${untouched}` };
   if (path.includes("/MobileSync/Backup/")) return { verdict: "unused", reason: `iphone or ipad backup${untouched}` };
   if (ARCHIVES.has(ext) && path.includes("/Downloads/")) return { verdict: "unused", reason: `downloaded archive${untouched}` };
-  if (SCREEN_CAPTURE.test(name) && since !== null && since > 14 * DAY)
-    return { verdict: "unused", reason: `screen capture from ${ago(since)}` };
+  if (SCREEN_CAPTURE.test(name) && since !== null) return { verdict: "yours", reason: `screen capture from ${ago(since)}` };
 
   // Things a tool owns; deleting by hand breaks the tool.
   if (lower === "docker.raw" || path.includes("/com.docker.docker/"))
@@ -132,13 +131,7 @@ export function classify(item: Item, category: CategoryId, usage?: Usage, now: n
   if (path.startsWith("/opt/homebrew") || path.startsWith("/usr/local/Cellar"))
     return { verdict: "system", reason: "homebrew manages this · brew cleanup removes old versions" };
 
-  // Nothing about the name says junk; fall back to how long it has sat there.
-  if (since !== null && usage) {
-    const verb = usage.kind === "opened" ? "not opened" : "not touched";
-    if (since > 365 * DAY) return { verdict: "unused", reason: `${verb} in ${age(since)}` };
-    if (since > 180 * DAY && (ext === ".app" || category === "movies" || path.includes("/Downloads/")))
-      return { verdict: "unused", reason: `${verb} in ${age(since)}` };
-    return { verdict: "yours", reason: `${usage.kind} ${ago(since)}` };
-  }
+  // Nothing about the name says what it is. How long ago it was used is a fact, not a verdict.
+  if (since !== null && usage) return { verdict: "yours", reason: `${usage.kind} ${ago(since)}` };
   return { verdict: "yours", reason: "" };
 }

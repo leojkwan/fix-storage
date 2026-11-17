@@ -1,10 +1,30 @@
 import { CATEGORIES, TIER_LABEL } from "./core/categories";
 import { startDemoScan } from "./core/demo";
 import { capacity, gb, size, tilde } from "./core/format";
+import { diskCleanSource } from "./core/diskclean";
+import { summaryJson, summaryText } from "./core/producers";
 import { startScan, type ScanSnapshot } from "./core/scan";
 
 /** Text and JSON output, for terminals without graphics and for scripts. Never deletes anything. */
 export async function runPlain(args: string[]): Promise<void> {
+  if (!args.includes("--scan")) return runProducers(args);
+  return runScan(args);
+}
+
+/** The producers and receipts summary from disk-clean. Runs no du. */
+async function runProducers(args: string[]): Promise<void> {
+  const source = diskCleanSource(process.env, { demo: args.includes("--demo") });
+  process.on("SIGINT", () => {
+    source.cancel();
+    process.exit(130);
+  });
+  const [doctor, receipts] = await Promise.all([source.doctor(), source.receipts()]);
+  const summary = { doctor, receipts };
+  process.stdout.write(args.includes("--json") ? summaryJson(summary) : summaryText(summary));
+}
+
+/** The folder scan summary, only under --scan: it runs du, which is slow on a nearly full disk. */
+async function runScan(args: string[]): Promise<void> {
   const json = args.includes("--json");
   const start = args.includes("--demo") ? startDemoScan : startScan;
   const live = process.stderr.isTTY === true;

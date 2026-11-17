@@ -5,6 +5,30 @@ moving to Trash and category clearing have been removed so a future deletion
 engine can use separately audited executors. The upstream installation links
 below refer to the original project.
 
+### Producers screen
+
+The app now opens on a **Producers** screen fed by the external `disk-clean`
+tool. It shows free space against a floor and a target, which producers are
+failing and who owns each, and what past clean-up runs freed according to `df`.
+It runs no `du` and no key cleans anything.
+
+- Doctor: `bash $DISK_CLEAN_SKILL_DIR/scripts/producer-doctor.sh --json`
+  (default `~/.agents/skills/disk-clean`). Exit 1 with valid JSON is a normal
+  "something fails" reading; any other exit, unparsable output or a 60 s
+  timeout shows as **unknown**, never healthy.
+- Receipts: `$DISK_CLEAN_STATE_DIR/receipts/` (default
+  `~/.local/state/disk-clean`). A plan receipt is shown as "plan only, not
+  proof" and never counts as freed space.
+- The meter's disk capacity comes from `statfs`; the doctor reports only free space.
+- The folder browser below is still there behind `--scan`.
+
+| Key | Producers screen |
+| --- | --- |
+| `↑` `↓` / `j` `k` | pick an owner, or move in the list |
+| `→` `←` / `l` `h`, `Tab` | switch panes |
+| `r` | ask the doctor again and reread receipts |
+| `q` | quit |
+
 <div align="center">
 
 # fix-storage
@@ -69,11 +93,12 @@ npm install && npm start
 ## Usage
 
 ```bash
-fix-storage              # scan your disk and open the interactive view
+fix-storage              # open the Producers screen (disk-clean doctor and receipts)
+fix-storage --scan       # open the folder browser; measures folders with du
 fix-storage --dry-run    # accepted for compatibility; has no effect
-fix-storage --demo       # a made-up disk, to try the interface; reads and deletes nothing
-fix-storage --plain      # print a text summary and exit
-fix-storage --json       # print the summary as JSON and exit
+fix-storage --demo       # made-up data, to try the interface; reads and deletes nothing
+fix-storage --plain      # print the producers and receipts summary and exit
+fix-storage --json       # print that summary as JSON and exit
 ```
 
 > [!TIP]
@@ -87,12 +112,13 @@ fix-storage --json       # print the summary as JSON and exit
 | `→` / `Enter` | look inside | open the folder |
 | `←` / `Esc` | | go up a level |
 | `g` | | jump to the culprit |
-| `f` | show only junk and unused | show only junk and unused |
 | `o` / `Space` | | reveal in Finder |
 | `Tab` | switch panes | switch panes |
 | `r` / `q` | rescan / quit | rescan / quit |
 
 Everything is clickable too: categories, the disk meter, rows, the breadcrumb and every action.
+
+When something was last opened is shown as a fact in its own column; age alone never labels an item.
 
 ## How it decides
 
@@ -101,7 +127,7 @@ Everything is clickable too: categories, the disk meter, rows, the breadcrumb an
 | Label | Meaning | Examples |
 | --- | --- | --- |
 | `junk` | Rebuilds by itself or is a leftover. Removing it loses nothing. | `node_modules`, `.next`, `__pycache__`, Pods, Xcode DerivedData, iOS DeviceSupport, `.dmg`/`.pkg` installers, caches, the Trash |
-| `unused` | Probably not needed, but your call. | build output, `.venv`, old simulators, Xcode archives, iPhone backups, archives in Downloads, screen recordings older than two weeks, anything not opened in a year |
+| `unused` | Probably not needed, but your call. | build output, `.venv`, old simulators, Xcode archives, iPhone backups, archives in Downloads |
 | `system` | A tool manages it; removing it by hand breaks the tool. The reason says which command to use instead. | Docker's disk image, Ollama models, Homebrew |
 | *(none)* | Yours and in use. | everything else |
 
@@ -133,13 +159,17 @@ src/
   main.tsx          entry point and key handling
   plain.ts          --plain / --json output
   core/
+    diskclean.ts    reads the disk-clean doctor and receipts
+    producers.ts    what the Producers screen and text modes show
     scan.ts         measures the disk with du
     categories.ts   which folders count toward which category
     classify.ts     junk / unused / system labels and their reasons
     browse.ts       folder listing, culprits, last-used dates, reveal
     demo.ts         the made-up demo disk
   ui/
-    app.tsx         the interface
+    app.tsx         the folder browser (--scan)
+    producers-app.tsx  the Producers screen
+    producers-store.ts its state
     bar.ts          the dot-matrix disk meter
     store.ts        app state and actions
 ```
