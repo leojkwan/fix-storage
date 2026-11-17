@@ -11,13 +11,16 @@ import test from "node:test";
 const root = fileURLToPath(new URL("../", import.meta.url));
 
 /** Files that may import the filesystem or start processes at all. */
-const MAY_TOUCH_DISK = new Set(["src/core/scan.ts", "src/core/browse.ts", "bin/fix-storage.cjs"]);
+const MAY_TOUCH_DISK = new Set(["src/core/scan.ts", "src/core/browse.ts", "src/core/diskclean.ts", "bin/fix-storage.cjs"]);
 
 /** Filesystem calls that only read. */
-const READ_ONLY_FS = new Set(["statfs", "readdir", "lstat", "stat"]);
+const READ_ONLY_FS = new Set(["statfs", "readdir", "lstat", "stat", "readFile", "access"]);
 
 /** Programs the viewer may start. None of them writes. */
-const PROGRAMS = new Set(['"du"', '"ps"', '"mdls"', '"open"', "process.execPath"]);
+const PROGRAMS = new Set(['"du"', '"ps"', '"mdls"', '"open"', '"bash"', "process.execPath"]);
+
+/** bash may only run the read-only doctor, and only from the disk-clean adapter. */
+const BASH_CALL = 'spawn("bash", [script, "--json"]';
 
 const FORBIDDEN = [
   "rmSync",
@@ -67,6 +70,8 @@ export function violationsIn(name, contents) {
   }
   for (const match of contents.matchAll(PROCESS_CALL)) {
     if (!PROGRAMS.has(match[2])) found.push(`${name} starts ${match[2]} with ${match[1]}()`);
+    if (match[2] === '"bash"' && (name !== "src/core/diskclean.ts" || !contents.includes(BASH_CALL)))
+      found.push(`${name} starts bash for something other than the doctor`);
   }
   return found;
 }
@@ -90,6 +95,8 @@ test("the guard catches the spellings a denylist misses", () => {
     ['const fs = await import("node:fs");', "src/ui/store.ts"],
     ['import { promises as fsp } from "node:fs";\nawait fsp.rename(a, b);', "src/core/browse.ts"],
     ['const { execSync } = require("child_process");', "src/main.tsx"],
+    ['import { spawn } from "node:child_process";\nspawn("bash", ["-c", command]);', "src/core/diskclean.ts"],
+    ['import { spawn } from "node:child_process";\nspawn("bash", [script, "--json"]);', "src/core/scan.ts"],
   ];
   for (const [contents, name] of bad) {
     assert.notDeepEqual(violationsIn(name, contents), [], `not caught: ${contents}`);
