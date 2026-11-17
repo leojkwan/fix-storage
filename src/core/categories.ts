@@ -144,6 +144,3 @@ export function roots(home: string = homedir()): Root[] {
     { path: h(".Trash"), category: "trash" },
   ];
 }
-
-/** The categories this tool is willing to clear, in the order it suggests them. */
-export const CLEARABLE: Array<Extract<CategoryId, "caches" | "trash">> = ["caches", "trash"];

@@ -3,9 +3,8 @@ import type { Color, NodeHandle, Root, Style } from "@zenbu-labs/pixel";
 import { basename, dirname } from "node:path";
 import { useEffect, useMemo, useRef, useSyncExternalStore, type ReactNode } from "react";
 import { CATEGORIES, CATEGORY, TIER_LABEL, type Category, type CategoryId, type Rgb, type Tier } from "../core/categories";
-import { deletesForGood, type Culprit } from "../core/browse";
+import type { Culprit } from "../core/browse";
 import { classify, shortAge, type Verdict } from "../core/classify";
-import type { Clearable } from "../core/clean";
 import { capacity, gb, size, tilde } from "../core/format";
 import type { Item } from "../core/scan";
 import { BAR_ROWS, BarCanvas, HEADROOM_ROWS, type BarModel } from "./bar";
@@ -18,7 +17,6 @@ const BG: Rgb = [0, 0, 0];
 const FG: Color = "#e6e6e6";
 const MUTED: Color = "#8c8c8c";
 const FAINT: Color = "#4f4f4f";
-const RED: Color = "#f87171";
 const GREEN: Color = "#4ade80";
 const AMBER: Color = "#fbbf24";
 
@@ -36,11 +34,6 @@ const ch = (fs: number, n: number) => fs * 0.6 * n;
 
 /** macOS puts a narrow no-break space before AM/PM in screenshot names; many fonts draw it as a box. */
 const clean = (name: string) => name.replace(/[\u202f\u00a0]/g, " ");
-
-const ACTION = {
-  caches: { label: "clear caches", doing: "clearing caches" },
-  trash: { label: "empty trash", doing: "emptying the trash" },
-} as const;
 
 const pct = (part: number, whole: number) => (whole > 0 ? `${Math.round((part / whole) * 100)}%` : "0%");
 const rgba = (c: Rgb, a: number): Color => [c[0], c[1], c[2], Math.round(Math.max(0, Math.min(1, a)) * 255)] as unknown as Color;
@@ -143,12 +136,12 @@ function Dots({ fraction, color, count, fs, seed, rows = 1, dim = false }: { fra
 function barModel(state: AppState): BarModel {
   const { scan } = state;
   const total = scan.total || 1;
-  const focus = scan.phase === "done" && !state.action ? state.selected : null;
+  const focus = scan.phase === "done" ? state.selected : null;
   return {
     segments: CATEGORIES.map((c) => ({ id: c.id, color: c.color, fraction: Math.min(1, scan.sizes[c.id] / total) })),
     hover: state.hover ?? focus,
     scanning: scan.phase === "scanning",
-    clearing: state.action?.id ?? null,
+    clearing: null,
   };
 }
 
@@ -213,17 +206,10 @@ function CellMeter({ state, fs }: { state: AppState; fs: number }) {
 // ---- top lines ----------------------------------------------------------------------
 
 function TopLine({ state, store, fs }: Ctx) {
-  const mode = store.options.demo ? "demo disk" : store.options.dryRun ? "dry run" : null;
-  const { scan, action } = state;
+  const mode = store.options.demo ? "demo disk" : null;
+  const { scan } = state;
   let status: ReactNode;
-  if (action) {
-    status = (
-      <>
-        <T fs={fs} color={CATEGORY[action.id].color} style={{ margin: { right: ch(fs, 2) } }}>{ACTION[action.id].doing + (store.pretend ? " (dry run)" : "")}</T>
-        <T fs={fs} color={FAINT} style={{ flexShrink: 1, ellipsis: true }}>{tilde(action.current)}</T>
-      </>
-    );
-  } else if (scan.phase === "scanning") {
+  if (scan.phase === "scanning") {
     status = (
       <>
         <T fs={fs} color={FG} style={{ margin: { right: ch(fs, 2) } }}>measuring</T>
@@ -273,7 +259,6 @@ function Totals({ state, fs }: Ctx) {
         <T fs={fs}>{known ? pct(scan.used, scan.total) : "…"}</T>
         <T fs={fs} color={MUTED}>{" full"}</T>
       </Box>
-      {state.freed > 0 ? <T fs={fs} color={GREEN}>{`${gb(state.freed)} freed this session`}</T> : null}
     </Box>
   );
 }
@@ -306,38 +291,6 @@ function CategoryLine({ category, state, store, fs }: Ctx & { category: Category
   );
 }
 
-function QuickWins({ state, store, fs }: Ctx) {
-  if (state.scan.phase !== "done") return <T fs={fs} color={FAINT}>looking for space you can get back…</T>;
-  const ids = (["caches", "trash"] as Clearable[]).filter((id) => store.canClear(id) || state.action?.id === id);
-  if (ids.length === 0) return <T fs={fs} color={FAINT}>nothing left that is safe to clear</T>;
-  const total = ids.reduce((sum, id) => sum + state.scan.sizes[id], 0);
-  const busy = state.action !== null || state.removing !== null;
-  return (
-    <Box style={{ flexDirection: "column", gap: fs * 0.35 }}>
-      <Box>
-        <T fs={fs} color={GREEN} bold>{gb(total)}</T>
-        <T fs={fs} color={MUTED}>{" safe to clear"}</T>
-      </Box>
-      {ids.map((id) => {
-        const armed = state.confirm?.kind === "category" && state.confirm.id === id;
-        return (
-          <Box key={id} style={{ gap: fs * 0.6 }}>
-            <T fs={fs} color={CATEGORY[id].color}>■</T>
-            {armed ? (
-              <T fs={fs} color={RED} onClick={() => store.press(id)}>{`delete ${gb(state.scan.sizes[id])} for good? press again`}</T>
-            ) : (
-              <Box style={{ pointerShape: busy ? "default" : "pointer" }} onClick={busy ? undefined : () => store.press(id)}>
-                <T fs={fs} color={busy ? FAINT : MUTED} style={{ width: ch(fs, 13) }}>{ACTION[id].label}</T>
-                <T fs={fs} color={busy ? FAINT : MUTED}>{gb(state.scan.sizes[id]).padStart(9)}</T>
-              </Box>
-            )}
-          </Box>
-        );
-      })}
-    </Box>
-  );
-}
-
 function Categories(ctx: Ctx & { width: number }) {
   const { state, fs, width } = ctx;
   return (
@@ -349,9 +302,6 @@ function Categories(ctx: Ctx & { width: number }) {
         <CategoryLine key={category.id} {...ctx} category={category} />
       ))}
       <Box style={{ flexGrow: 1 }} />
-      <Box style={{ padding: { left: fs * 1.2 } }}>
-        <QuickWins {...ctx} />
-      </Box>
     </Box>
   );
 }
@@ -389,8 +339,6 @@ function InsideHeader(ctx: Ctx) {
   const category = CATEGORY[state.selected];
   const scope = store.scopeSize();
   const top = state.stack[state.stack.length - 1];
-  const canClear = !top && store.canClear(category.id);
-  const armed = canClear && state.confirm?.kind === "category" && state.confirm.id === category.id;
   return (
     <Box style={{ flexDirection: "column", gap: fs * 0.35, flexShrink: 0 }}>
       <Box style={{ justifyContent: "space-between", gap: fs * 2 }}>
@@ -405,13 +353,6 @@ function InsideHeader(ctx: Ctx) {
         <T fs={fs} color={FAINT} style={{ flexShrink: 1, ellipsis: true }}>
           {top ? tilde(top.path) : category.blurb}
         </T>
-        {canClear ? (
-          armed ? (
-            <T fs={fs} color={RED} onClick={() => store.press(category.id as Clearable)}>{`c again to delete all ${gb(scope)}`}</T>
-          ) : (
-            <Hint fs={fs} k="c" label={ACTION[category.id as Clearable].label} keyColor={GREEN} onClick={() => store.press(category.id as Clearable)} />
-          )
-        ) : null}
       </Box>
       <Reclaimable {...ctx} />
     </Box>
@@ -482,7 +423,7 @@ function ItemLine({ item, index, max, rowRef, ...ctx }: Ctx & { item: Item; inde
       </T>
       <T fs={fs} color={item.dir ? category.color : FAINT} style={{ width: ch(fs, 1) }}>{item.dir ? "▸" : ""}</T>
       <Box style={{ flexGrow: 1, flexShrink: 1, minWidth: 0, overflow: "hidden" }}>
-        <T fs={fs} color={state.removing === item.path ? FAINT : selected ? FG : "#b5b5b5"} bold={selected} style={{ flexShrink: 1, ellipsis: true }}>
+        <T fs={fs} color={selected ? FG : "#b5b5b5"} bold={selected} style={{ flexShrink: 1, ellipsis: true }}>
           {name + (item.dir ? "/" : "")}
         </T>
         {state.stack.length === 0 ? (
@@ -518,10 +459,6 @@ function CulpritLine({ item, culprit, fs, color, category }: { item: Item; culpr
 /** What the highlighted item is, where its space is, and what you can do with it. */
 function ItemDetails({ item, index, ...ctx }: Ctx & { item: Item; index: number }) {
   const { state, store, fs } = ctx;
-  const forGood = deletesForGood(state.selected);
-  const blocked = store.blocked(item);
-  const armed = state.confirm?.kind === "item" && state.confirm.path === item.path;
-  const removing = state.removing === item.path;
   const label = store.label(item);
   const verdict = VERDICT[label.verdict];
   const culprit = item.dir ? state.culprits[item.path] : undefined;
@@ -554,24 +491,9 @@ function ItemDetails({ item, index, ...ctx }: Ctx & { item: Item; index: number 
       ) : null}
 
       <Box style={{ ...line, ...indent, gap: ch(fs, 3) }}>
-        {removing ? (
-          <T fs={fs} color={MUTED}>{forGood ? "deleting…" : "moving to trash…"}</T>
-        ) : (
-          <>
-            {item.dir ? <Hint fs={fs} k="→" label="open" onClick={() => store.open(index)} /> : null}
-            {hasCulprit ? <Hint fs={fs} k="g" label="go to culprit" keyColor={AMBER} onClick={() => store.goToCulprit(index)} /> : null}
-            <Hint fs={fs} k="o" label="reveal in finder" onClick={() => void store.reveal(index)} />
-            {state.selected === "system" ? null : armed ? (
-              <T fs={fs} color={RED} bold onClick={() => store.removeItem(index)}>
-                {forGood ? `⌫ again to delete ${size(item.size)} for good` : `⌫ again to move ${size(item.size)} to trash`}
-              </T>
-            ) : blocked ? (
-              <T fs={fs} color={FAINT}>{`can't remove: ${blocked.toLowerCase()}`}</T>
-            ) : (
-              <Hint fs={fs} k="⌫" label={forGood ? "delete" : "move to trash"} keyColor={RED} onClick={() => store.removeItem(index)} />
-            )}
-          </>
-        )}
+        {item.dir ? <Hint fs={fs} k="→" label="open" onClick={() => store.open(index)} /> : null}
+        {hasCulprit ? <Hint fs={fs} k="g" label="go to culprit" keyColor={AMBER} onClick={() => store.goToCulprit(index)} /> : null}
+        <Hint fs={fs} k="o" label="reveal in finder" onClick={() => void store.reveal(index)} />
       </Box>
     </Box>
   );
@@ -643,8 +565,8 @@ function Inside(ctx: Ctx) {
 function BottomLine({ state, fs }: Ctx) {
   const keys: Array<[string, string]> =
     state.pane === "list"
-      ? [["↑↓", "move"], ["→", "open"], ["←", "back"], ["g", "culprit"], ["f", "junk only"], ["o", "reveal"], ["⌫", "remove"], ["q", "quit"]]
-      : [["↑↓", "category"], ["→", "look inside"], ["f", "junk only"], ["c", "clear"], ["r", "rescan"], ["q", "quit"]];
+      ? [["↑↓", "move"], ["→", "open"], ["←", "back"], ["g", "culprit"], ["f", "junk only"], ["o", "reveal"], ["q", "quit"]]
+      : [["↑↓", "category"], ["→", "look inside"], ["f", "junk only"], ["r", "rescan"], ["q", "quit"]];
   return (
     <Box style={{ justifyContent: "space-between", gap: fs * 2, flexShrink: 0 }}>
       <Box style={{ gap: fs * 1.4, flexShrink: 0 }}>

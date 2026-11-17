@@ -1,34 +1,21 @@
 import { basename } from "node:path";
-import { CATEGORIES, CATEGORY, CLEARABLE, type CategoryId } from "../core/categories";
+import { CATEGORIES, type CategoryId } from "../core/categories";
 import { classify, type Label, type Usage } from "../core/classify";
 import {
-  cannotRemove,
   demoCulprit,
   demoUsage,
   findCulprit,
   forgetAllSizes,
-  forgetSizes,
   usage as lookUpUsage,
   type Culprit,
-  deleteForGood,
-  deletesForGood,
   demoChildren,
   listFolder,
-  moveToTrash,
   reveal,
-  trashPathFor,
   type ListHandle,
 } from "../core/browse";
-import { clean, plan, type Clearable } from "../core/clean";
-import { demoPlan, startDemoScan } from "../core/demo";
-import { size, tilde } from "../core/format";
-import { diskSpace, emptySnapshot, measure, startScan, type Item, type ScanHandle, type ScanSnapshot } from "../core/scan";
-
-export interface Action {
-  id: Clearable;
-  /** Path being removed right now. */
-  current: string;
-}
+import { startDemoScan } from "../core/demo";
+import { tilde } from "../core/format";
+import { emptySnapshot, startScan, type Item, type ScanHandle, type ScanSnapshot } from "../core/scan";
 
 /** Which side of the screen the arrow keys move in. */
 export type Pane = "sidebar" | "list";
@@ -54,14 +41,6 @@ export interface AppState {
   children: Item[];
   /** True while the opened folder is still being measured. */
   listing: boolean;
-  /** Category-wide clearing in progress. */
-  action: Action | null;
-  /** What is waiting for a second press: a category to clear, or one item to remove. */
-  confirm: { kind: "category"; id: Clearable } | { kind: "item"; path: string } | null;
-  /** Item being moved or deleted right now. */
-  removing: string | null;
-  /** Bytes freed since the app started. */
-  freed: number;
   /** One line about the last action, shown until the next one. */
   note: string | null;
   /** When each listed item was last opened or changed, by path. */
@@ -74,13 +53,10 @@ export interface AppState {
 
 export interface Options {
   demo: boolean;
-  dryRun: boolean;
 }
 
 type Listener = () => void;
 
-/** Sizes below this are not worth a suggestion. */
-const WORTH_CLEARING = 50e6;
 /** Longest list the detail pane draws. */
 export const MAX_ROWS = 150;
 
@@ -94,10 +70,6 @@ export class Store {
     stack: [],
     children: [],
     listing: false,
-    action: null,
-    confirm: null,
-    removing: null,
-    freed: 0,
     note: null,
     usage: {},
     culprits: {},
@@ -106,7 +78,6 @@ export class Store {
   private listeners = new Set<Listener>();
   private scanHandle: ScanHandle | null = null;
   private listHandle: ListHandle | null = null;
-  private confirmTimer: NodeJS.Timeout | null = null;
   private culpritHandle: ListHandle | null = null;
   private culpritQueue: Item[] = [];
   private usagePending = new Set<string>();
@@ -145,7 +116,6 @@ export class Store {
   }
 
   toggleJunkOnly() {
-    this.clearConfirm();
     this.set({ junkOnly: !this.state.junkOnly, row: 0 });
   }
 
@@ -228,10 +198,9 @@ export class Store {
   goToCulprit(row = this.state.row) {
     const item = this.entries()[row];
     const culprit = item ? this.state.culprits[item.path] : undefined;
-    if (!item || !culprit || culprit === "pending" || culprit.chain.length === 0 || this.state.removing) return;
+    if (!item || !culprit || culprit === "pending" || culprit.chain.length === 0) return;
     this.listHandle?.cancel();
     this.dropCulpritWork();
-    this.clearConfirm();
     const path = [item, ...culprit.chain];
     const last = path[path.length - 1];
     // Land in the folder that holds the culprit, with the culprit highlighted.
@@ -241,18 +210,11 @@ export class Store {
     this.openItem(target, last.path);
   }
 
-  /** True when nothing is deleted for real. */
-  get pretend(): boolean {
-    return this.options.demo || this.options.dryRun;
-  }
-
   // ---- scanning ------------------------------------------------------------
 
   rescan() {
-    if (this.state.action || this.state.removing) return;
     this.scanHandle?.cancel();
     this.listHandle?.cancel();
-    this.clearConfirm();
     this.dropCulpritWork();
     forgetAllSizes();
     this.set({ scan: emptySnapshot(), note: null, stack: [], children: [], listing: false, row: 0, culprits: {} });
@@ -277,7 +239,6 @@ export class Store {
     }
     this.listHandle?.cancel();
     this.dropCulpritWork();
-    this.clearConfirm();
     this.set({ selected: id, stack: [], children: [], listing: false, row: 0, pane });
   }
 
@@ -332,23 +293,20 @@ export class Store {
     if (count === 0) return;
     const row = Math.max(0, Math.min(count - 1, this.state.row + delta));
     if (row !== this.state.row) {
-      this.clearConfirm();
       this.set({ row });
     }
   }
 
   setRow(row: number) {
-    if (row !== this.state.row) this.clearConfirm();
     this.set({ row, pane: "list" });
   }
 
   /** Opens the highlighted folder and measures what is inside. */
   open(row = this.state.row) {
     const item = this.entries()[row];
-    if (!item || !item.dir || this.state.removing) return;
+    if (!item || !item.dir) return;
     this.listHandle?.cancel();
     this.dropCulpritWork();
-    this.clearConfirm();
     const stack = [...this.state.stack, { path: item.path, size: item.size }];
 
     if (this.options.demo) {
@@ -373,7 +331,6 @@ export class Store {
 
   /** Goes up one folder; from the category's top level, back to the sidebar. */
   back() {
-    this.clearConfirm();
     const { stack } = this.state;
     if (stack.length === 0) {
       this.set({ pane: "sidebar" });
@@ -417,7 +374,6 @@ export class Store {
     if (level >= stack.length - 1) return;
     this.listHandle?.cancel();
     this.dropCulpritWork();
-    this.clearConfirm();
     if (level < 0) {
       this.set({ stack: [], children: [], listing: false, row: 0 });
       return;
@@ -428,14 +384,6 @@ export class Store {
   }
 
   // ---- acting on items -----------------------------------------------------
-
-  /** Why the highlighted item cannot be removed, or null. */
-  blocked(item: Item | undefined): string | null {
-    if (!item) return "Nothing selected.";
-    if (this.state.selected === "system") return "macOS manages System data.";
-    if (this.options.demo) return null;
-    return cannotRemove(item.path);
-  }
 
   async reveal(row = this.state.row) {
     const item = this.entries()[row];
@@ -452,199 +400,8 @@ export class Store {
     }
   }
 
-  /** First press arms, second press within a few seconds removes. */
-  removeItem(row = this.state.row) {
-    const { state } = this;
-    if (state.action || state.removing || state.scan.phase !== "done") return;
-    const item = this.entries()[row];
-    const reason = this.blocked(item);
-    if (reason) {
-      this.set({ note: reason });
-      return;
-    }
-    if (state.confirm?.kind === "item" && state.confirm.path === item.path) {
-      this.clearConfirm();
-      void this.runRemove(item);
-      return;
-    }
-    this.arm({ kind: "item", path: item.path });
-    if (row !== state.row) this.set({ row, pane: "list" });
-  }
-
-  private async runRemove(item: Item) {
-    const category = this.state.selected;
-    const forGood = deletesForGood(category);
-    this.set({ removing: item.path, note: null });
-
-    let ok = true;
-    let error = "";
-    if (this.pretend) {
-      await new Promise((done) => setTimeout(done, 450));
-    } else {
-      try {
-        if (forGood) await deleteForGood(item.path);
-        else await moveToTrash(item.path);
-      } catch (e) {
-        ok = false;
-        error = e instanceof Error ? e.message : String(e);
-      }
-    }
-
-    if (!ok) {
-      const short = error.split("\n")[0].slice(0, 120);
-      this.set({ removing: null, note: `Could not remove ${basename(item.path)}${short ? `: ${short}` : "."}` });
-      return;
-    }
-
-    // Anything measured above or inside it is out of date now.
-    forgetSizes(item.path);
-    const culprits = { ...this.state.culprits };
-    for (const path of Object.keys(culprits)) {
-      if (path === item.path || item.path.startsWith(path + "/")) delete culprits[path];
-    }
-    this.state = { ...this.state, culprits };
-
-    // Take the item out of every list that holds it, and shrink the folders above it.
-    const { scan, stack, children } = this.state;
-    const drop = (list: Item[]) => list.filter((i) => i.path !== item.path);
-    const sizes = { ...scan.sizes, [category]: Math.max(0, scan.sizes[category] - item.size) };
-    const items = { ...scan.items, [category]: drop(scan.items[category]) };
-    const shrink = (list: Item[]) =>
-      list.map((i) => (item.path.startsWith(i.path + "/") ? { ...i, size: Math.max(0, i.size - item.size) } : i));
-    items[category] = shrink(items[category]);
-    const nextStack = stack.map((level) => ({ ...level, size: Math.max(0, level.size - item.size) }));
-
-    let used = scan.used;
-    let available = scan.available;
-    let freed = this.state.freed;
-    if (forGood) {
-      used -= item.size;
-      available += item.size;
-      freed += item.size;
-    } else {
-      // Still on disk, only in the Trash now.
-      sizes.trash += item.size;
-      items.trash = [{ path: trashPathFor(item.path), size: item.size, dir: item.dir }, ...items.trash].sort(
-        (a, b) => b.size - a.size,
-      );
-    }
-    if (!this.pretend && forGood) {
-      const space = await diskSpace();
-      if (space.total > 0) {
-        used = space.total - space.available;
-        available = space.available;
-      }
-    }
-
-    const list = stack.length === 0 ? items[category] : drop(children);
-    const verb = forGood ? "Deleted" : "Moved to Trash:";
-    const prefix = this.pretend ? "Dry run, nothing changed. Would have " + (forGood ? "deleted" : "moved to Trash") : verb;
-    this.set({
-      scan: { ...scan, sizes, items, used, available },
-      stack: nextStack,
-      children: stack.length === 0 ? children : list,
-      row: Math.min(this.state.row, Math.max(0, Math.min(list.length, MAX_ROWS) - 1)),
-      removing: null,
-      freed,
-      note: `${prefix} ${basename(item.path)} (${size(item.size)}).${forGood || this.pretend ? "" : " Empty the Trash to get the space back."}`,
-    });
-  }
-
-  // ---- clearing a whole category ------------------------------------------
-
-  /** The next thing worth clearing, or null. */
-  suggestion(): Clearable | null {
-    const { scan, action } = this.state;
-    if (action) return action.id;
-    if (scan.phase !== "done") return null;
-    return CLEARABLE.find((id) => scan.sizes[id] >= WORTH_CLEARING) ?? null;
-  }
-
-  canClear(id: CategoryId): id is Clearable {
-    return (CLEARABLE as CategoryId[]).includes(id) && this.state.scan.sizes[id] >= WORTH_CLEARING;
-  }
-
-  /** First press arms the button, second press within a few seconds clears. */
-  press(id: Clearable) {
-    if (this.state.action || this.state.removing || this.state.scan.phase !== "done") return;
-    if (this.state.confirm?.kind === "category" && this.state.confirm.id === id) {
-      this.clearConfirm();
-      void this.run(id);
-      return;
-    }
-    this.arm({ kind: "category", id });
-  }
-
-  private arm(confirm: NonNullable<AppState["confirm"]>) {
-    this.clearConfirm();
-    this.set({ confirm });
-    this.confirmTimer = setTimeout(() => this.set({ confirm: null }), 4000);
-  }
-
-  private clearConfirm() {
-    if (this.confirmTimer) clearTimeout(this.confirmTimer);
-    this.confirmTimer = null;
-    if (this.state.confirm) this.set({ confirm: null });
-  }
-
-  private async run(id: Clearable) {
-    const before = this.state.scan.sizes[id];
-    this.listHandle?.cancel();
-    this.set({ action: { id, current: "" }, note: null, hover: null, selected: id, stack: [], children: [], row: 0 });
-
-    const items = this.options.demo ? demoPlan(id) : await plan(id, this.state.scan.items[id]);
-
-    const onProgress = ({ path, freed }: { path: string; freed: number }) => {
-      const scan = this.state.scan;
-      const taken = Math.min(freed, scan.sizes[id]);
-      this.set({
-        action: { id, current: path },
-        scan: {
-          ...scan,
-          sizes: { ...scan.sizes, [id]: scan.sizes[id] - taken },
-          used: scan.used - taken,
-          available: scan.available + taken,
-        },
-      });
-    };
-
-    let skipped = 0;
-    if (this.options.demo) {
-      for (const item of items) {
-        await new Promise((done) => setTimeout(done, 70));
-        onProgress({ path: item.path, freed: item.size });
-      }
-    } else {
-      const result = await clean(id, items, { dryRun: this.options.dryRun, onProgress });
-      skipped = result.skipped.length;
-    }
-
-    // Replace the running estimate with what is actually on disk now.
-    let scan = this.state.scan;
-    if (!this.pretend) {
-      const [left, space] = await Promise.all([measure(id), diskSpace()]);
-      const sizes = { ...scan.sizes, [id]: left };
-      const used = space.total > 0 ? space.total - space.available : scan.used;
-      scan = { ...scan, sizes, used, available: space.total > 0 ? space.available : scan.available };
-    }
-    const freed = Math.max(0, before - scan.sizes[id]);
-    scan = { ...scan, items: { ...scan.items, [id]: [] } };
-
-    const parts: string[] = [`${CATEGORY[id].name}: ${size(freed)} cleared.`];
-    if (this.pretend) parts.push("Dry run: nothing was deleted.");
-    if (skipped > 0) parts.push(`${skipped} ${skipped === 1 ? "item was" : "items were"} in use or protected and left alone.`);
-    this.set({
-      scan,
-      action: null,
-      pane: "sidebar",
-      freed: this.state.freed + freed,
-      note: parts.join(" "),
-    });
-  }
-
   stop() {
     this.scanHandle?.cancel();
     this.listHandle?.cancel();
-    if (this.confirmTimer) clearTimeout(this.confirmTimer);
   }
 }

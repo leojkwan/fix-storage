@@ -7,14 +7,14 @@ const path = require("node:path");
 const args = process.argv.slice(2);
 const appDir = path.resolve(__dirname, "..");
 
-const HELP = `fix-storage: see what is filling your Mac's disk and clear what is safe to clear.
+const HELP = `fix-storage: see what is filling your Mac's disk.
 
 Usage: fix-storage [options]
 
   (no options)   Open the interactive view. Needs a terminal with kitty
                  graphics (Ghostty, kitty, iTerm2, WezTerm); other terminals
                  get a simpler character view.
-  --dry-run      Interactive view, but clearing only pretends: nothing is deleted.
+  --dry-run      Accepted for compatibility; has no effect.
   --demo         Interactive view on a made-up disk. Reads and deletes nothing.
   --plain        Print a text summary and exit. Deletes nothing.
   --json         Print the summary as JSON and exit. Deletes nothing.

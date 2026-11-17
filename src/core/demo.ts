@@ -1,5 +1,4 @@
 import { CATEGORIES, type CategoryId } from "./categories";
-import type { Clearable } from "./clean";
 import { emptySnapshot, type Item, type ScanHandle, type ScanSnapshot } from "./scan";
 
 /** A made-up 512 GB disk, for trying the interface without touching the real one. */
@@ -51,14 +50,6 @@ function split(total: number, paths: string[]): Item[] {
   const weights = paths.map((_, i) => 1 / (i + 1.4));
   const sum = weights.reduce((a, b) => a + b, 0);
   return paths.map((path, i) => ({ path, size: (total * weights[i]) / sum, dir: !/\.(zip|mov|dmg|pkg)$/i.test(path) }));
-}
-
-export function demoPlan(category: Clearable): Item[] {
-  const items = split(SIZES[category], PATHS[category]);
-  // Many small steps so the clearing animation has something to show.
-  return items.flatMap((item) =>
-    Array.from({ length: 6 }, (_, i) => ({ path: i === 0 ? item.path : `${item.path}/${i}`, size: item.size / 6 })),
-  );
 }
 
 export function startDemoScan(onUpdate: (snapshot: ScanSnapshot) => void): ScanHandle {
