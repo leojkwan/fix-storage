@@ -1,8 +1,7 @@
 import { execFile, spawn, type ChildProcess } from "node:child_process";
 import { promises as fsp } from "node:fs";
-import { homedir } from "node:os";
-import { basename, dirname, join, resolve, sep } from "node:path";
-import { roots, type CategoryId } from "./categories";
+import { dirname, join } from "node:path";
+import type { CategoryId } from "./categories";
 import { isWhole, type Usage } from "./classify";
 import { du, type Item } from "./scan";
 
@@ -15,13 +14,6 @@ export interface ListHandle {
  * later reuses them instead of measuring again, so diving in is instant.
  */
 const known = new Map<string, number>();
-
-/** Drops remembered sizes for a path, everything inside it, and every folder above it. */
-export function forgetSizes(path: string) {
-  for (const key of known.keys()) {
-    if (key === path || key.startsWith(path + "/") || path.startsWith(key + "/")) known.delete(key);
-  }
-}
 
 export function forgetAllSizes() {
   known.clear();
@@ -283,92 +275,12 @@ export function demoUsage(path: string, now: number = Date.now()): Usage {
   return { at: now - days * 24 * 3600 * 1000, kind: /\.(app|mov|mp4|key|dmg)$/i.test(path) ? "opened" : "changed" };
 }
 
-// ---- acting on one item -------------------------------------------------
-
-/** Folders whose removal would break the system or the user's account, whatever is inside. */
-function protectedPaths(home: string): Set<string> {
-  const lib = (name: string) => join(home, "Library", name);
-  return new Set(
-    [
-      ...roots(home).map((r) => r.path),
-      "/",
-      "/System",
-      "/Library",
-      "/usr",
-      "/usr/local/bin",
-      "/usr/local/lib",
-      "/opt/homebrew/bin",
-      "/opt/homebrew/lib",
-      home,
-      join(home, "Library"),
-      lib("Keychains"),
-      lib("Preferences"),
-      lib("Mail"),
-      lib("Messages"),
-      lib("Accounts"),
-      lib("Cookies"),
-      lib("Calendars"),
-      lib("Safari"),
-      lib("Photos"),
-      lib("Biome"),
-    ].map((p) => resolve(p)),
-  );
-}
-
-/** Why an item cannot be removed, or null when it can. */
-export function cannotRemove(path: string, home: string = homedir()): string | null {
-  if (!path.startsWith("/")) return "Not a real path.";
-  const target = resolve(path);
-  if (protectedPaths(home).has(target)) return "macOS or your account needs this folder.";
-  if (target.startsWith("/System/") || target.startsWith("/private/")) return "macOS manages this.";
-  const known = roots(home).some((root) => target.startsWith(resolve(root.path) + sep));
-  if (!known) return "Outside the folders this tool looks at.";
-  return null;
-}
-
-/** True when the item lives where permanent deletion is fine: caches and the Trash. */
-export function deletesForGood(category: CategoryId): boolean {
-  return category === "caches" || category === "trash";
-}
-
-function run(file: string, args: string[]): Promise<void> {
+/** Opens a Finder window with the item selected. */
+export function reveal(path: string): Promise<void> {
   return new Promise((done, fail) => {
-    execFile(file, args, (error, _stdout, stderr) => {
+    execFile("open", ["-R", path], (error, _stdout, stderr) => {
       if (error) fail(new Error(stderr.trim() || error.message));
       else done();
     });
   });
-}
-
-/** Moves a file or folder to the Trash, where it can be put back from Finder. */
-export async function moveToTrash(path: string): Promise<void> {
-  try {
-    await fsp.access("/usr/bin/trash");
-    await run("/usr/bin/trash", [path]);
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
-    await run("osascript", [
-      "-e",
-      "on run argv",
-      "-e",
-      'tell application "Finder" to delete (POSIX file (item 1 of argv) as alias)',
-      "-e",
-      "end run",
-      path,
-    ]);
-  }
-}
-
-/** Deletes for good. Only used for caches and things already in the Trash. */
-export async function deleteForGood(path: string): Promise<void> {
-  await fsp.rm(path, { recursive: true, force: true });
-}
-
-/** Opens a Finder window with the item selected. */
-export function reveal(path: string): Promise<void> {
-  return run("open", ["-R", path]);
-}
-
-export function trashPathFor(path: string, home: string = homedir()): string {
-  return join(home, ".Trash", basename(path));
 }

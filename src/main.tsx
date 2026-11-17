@@ -3,7 +3,7 @@ import { App } from "./ui/app";
 import { Store } from "./ui/store";
 
 const args = new Set(process.argv.slice(2));
-const store = new Store({ demo: args.has("--demo"), dryRun: args.has("--dry-run") });
+const store = new Store({ demo: args.has("--demo") });
 
 const quit = () => {
   store.stop();
@@ -12,7 +12,6 @@ const quit = () => {
 
 /** Keys while the category list on the left has focus. */
 function sidebarKey(key: string): boolean {
-  const { selected } = store.get();
   switch (key) {
     case "up":
     case "k":
@@ -25,20 +24,12 @@ function sidebarKey(key: string): boolean {
     case "enter":
     case "tab":
       return store.setPane("list"), true;
-    case "c":
-      if (store.canClear(selected)) store.press(selected);
-      else {
-        const id = store.suggestion();
-        if (id) store.press(id);
-      }
-      return true;
   }
   return false;
 }
 
 /** Keys while the item list on the right has focus. */
 function listKey(key: string): boolean {
-  const { selected } = store.get();
   switch (key) {
     case "up":
     case "k":
@@ -69,13 +60,6 @@ function listKey(key: string): boolean {
     case "o":
     case "space":
       return void store.reveal(), true;
-    case "backspace":
-    case "delete":
-    case "d":
-      return store.removeItem(), true;
-    case "c":
-      if (store.get().stack.length === 0 && store.canClear(selected)) store.press(selected);
-      return true;
   }
   return false;
 }

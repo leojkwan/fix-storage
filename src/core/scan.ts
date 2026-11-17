@@ -251,14 +251,3 @@ export function startScan(onUpdate: (snapshot: ScanSnapshot) => void, options: S
     done: run(),
   };
 }
-
-/** Re-measures one category after something was deleted from it. */
-export async function measure(category: Exclude<CategoryId, "system">, home: string = homedir()): Promise<number> {
-  const children = new Set<ChildProcess>();
-  let total = 0;
-  for (const root of roots(home)) {
-    if (root.category !== category) continue;
-    total += (await du(root.path, children)).bytes;
-  }
-  return total;
-}

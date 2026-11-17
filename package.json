@@ -1,7 +1,7 @@
 {
   "name": "fix-storage",
   "version": "0.1.0",
-  "description": "See what is filling your Mac's disk, find the culprit, and clear what is safe to clear, from the terminal.",
+  "description": "See what is filling your Mac's disk and find the culprit, from the terminal.",
   "keywords": [
     "macos",
     "disk",
@@ -42,6 +42,7 @@
     "demo": "tsc -p tsconfig.json && node bin/fix-storage.cjs --demo",
     "plain": "tsc -p tsconfig.json && node bin/fix-storage.cjs --plain",
     "typecheck": "tsc --noEmit",
+    "test": "node --test",
     "prepack": "npm run build",
     "clean": "rm -rf dist"
   },

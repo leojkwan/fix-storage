@@ -1,8 +1,15 @@
+## Read-only fork
+
+This fork keeps the upstream interface as a read-only disk viewer. File deletion,
+moving to Trash and category clearing have been removed so a future deletion
+engine can use separately audited executors. The upstream installation links
+below refer to the original project.
+
 <div align="center">
 
 # fix-storage
 
-**See what is filling your Mac's disk, find the culprit, and clear what is safe to clear, from the terminal.**
+**See what is filling your Mac's disk and find the culprit, from the terminal.**
 
 [![CI](https://github.com/govijr/fix-storage/actions/workflows/ci.yml/badge.svg)](https://github.com/govijr/fix-storage/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/govijr/fix-storage?color=4ade80)](https://github.com/govijr/fix-storage/releases)
@@ -26,7 +33,6 @@ curl -fsSL https://raw.githubusercontent.com/govijr/fix-storage/main/install.sh 
 - **Finds the culprit.** Under every big folder it prints where the space actually is, following the biggest subfolder down: `└ mostly in app/node_modules/  31.2 GB · 77%  junk`. Press `g` to jump straight there.
 - **Labels everything.** Each item is tagged `junk`, `unused`, `system` or left as yours, with a one-line reason: *rebuilds with npm install · not touched in 7 months*, *installer · not needed once installed*, *screen capture from 3 weeks ago*.
 - **Shows when you last used it.** Last-opened dates come from Spotlight, so an app you haven't opened in two years stands out.
-- **Clears safely.** Caches and the Trash are cleared for good; everything else goes to the Trash so you can get it back. Nothing is removed without a second keypress.
 - **Feels like a terminal tool.** One monospace font, keyboard first, mouse optional, with a live dot-matrix disk meter drawn in real pixels.
 
 ## Install
@@ -64,7 +70,7 @@ npm install && npm start
 
 ```bash
 fix-storage              # scan your disk and open the interactive view
-fix-storage --dry-run    # same, but deleting only pretends
+fix-storage --dry-run    # accepted for compatibility; has no effect
 fix-storage --demo       # a made-up disk, to try the interface; reads and deletes nothing
 fix-storage --plain      # print a text summary and exit
 fix-storage --json       # print the summary as JSON and exit
@@ -83,8 +89,6 @@ fix-storage --json       # print the summary as JSON and exit
 | `g` | | jump to the culprit |
 | `f` | show only junk and unused | show only junk and unused |
 | `o` / `Space` | | reveal in Finder |
-| `⌫` / `d` | | move to Trash, or delete for caches and Trash (press twice) |
-| `c` | clear all caches / empty the Trash (press twice) | |
 | `Tab` | switch panes | switch panes |
 | `r` / `q` | rescan / quit | rescan / quit |
 
@@ -106,13 +110,6 @@ The rules live in [`src/core/classify.ts`](src/core/classify.ts). They are delib
 ### Culprits
 
 For a folder, fix-storage runs one `du` pass over it, then follows the biggest child down for as long as that child holds more than half of its parent. It stops at things that are one unit to you, like `node_modules`, `.app` bundles or a Photos library, and ends at a single file if one file is most of the folder. When no one thing dominates, it shows the three biggest instead. Sizes measured along the way are reused, so opening those folders afterwards is instant.
-
-### What it will and won't remove
-
-- **Caches and Trash** items are deleted for good. Apps rebuild caches when they need them.
-- **Everything else** is moved to the Trash (with macOS's own `trash` command, or Finder on older systems), so you can drag it back out. The space comes back once you empty the Trash.
-- **Never removed:** System data, anything under `/System` or `/private`, your Keychains, Preferences, Mail, Messages, Photos and Safari data, the top-level folders the scan measures, and anything outside them.
-- `--dry-run` and `--demo` never touch the disk.
 
 ## Uninstall
 
@@ -139,8 +136,7 @@ src/
     scan.ts         measures the disk with du
     categories.ts   which folders count toward which category
     classify.ts     junk / unused / system labels and their reasons
-    browse.ts       folder listing, culprits, last-used dates, reveal, trash
-    clean.ts        clearing a whole category
+    browse.ts       folder listing, culprits, last-used dates, reveal
     demo.ts         the made-up demo disk
   ui/
     app.tsx         the interface
