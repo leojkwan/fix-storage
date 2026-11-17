@@ -47,8 +47,6 @@ export interface AppState {
   usage: Record<string, Usage>;
   /** Where the space inside each folder is, by path; "pending" while it is being measured. */
   culprits: Record<string, Culprit | "pending">;
-  /** Show only things labelled junk or unused. */
-  junkOnly: boolean;
 }
 
 export interface Options {
@@ -73,7 +71,6 @@ export class Store {
     note: null,
     usage: {},
     culprits: {},
-    junkOnly: false,
   };
   private listeners = new Set<Listener>();
   private scanHandle: ScanHandle | null = null;
@@ -101,8 +98,7 @@ export class Store {
       before.stack !== this.state.stack ||
       before.children !== this.state.children ||
       before.row !== this.state.row ||
-      before.scan.phase !== this.state.scan.phase ||
-      before.junkOnly !== this.state.junkOnly
+      before.scan.phase !== this.state.scan.phase
     ) {
       this.scheduleEnrich();
     }
@@ -113,10 +109,6 @@ export class Store {
   /** What an item probably is, and why. */
   label(item: Item, state: AppState = this.state): Label {
     return classify(item, state.selected, state.usage[item.path]);
-  }
-
-  toggleJunkOnly() {
-    this.set({ junkOnly: !this.state.junkOnly, row: 0 });
   }
 
   /** Fetches dates and culprits for whatever just came on screen, once things settle. */
@@ -261,25 +253,7 @@ export class Store {
 
   /** Every entry, including those past the drawing limit. */
   allEntries(state: AppState = this.state): Item[] {
-    const list = state.stack.length === 0 ? state.scan.items[state.selected] : state.children;
-    if (!state.junkOnly) return list;
-    return list.filter((item) => {
-      const { verdict } = this.label(item, state);
-      return verdict === "junk" || verdict === "unused";
-    });
-  }
-
-  /** Bytes in the current list labelled junk, and labelled unused. */
-  reclaimable(state: AppState = this.state): { junk: number; unused: number } {
-    const list = state.stack.length === 0 ? state.scan.items[state.selected] : state.children;
-    let junk = 0;
-    let unused = 0;
-    for (const item of list) {
-      const { verdict } = this.label(item, state);
-      if (verdict === "junk") junk += item.size;
-      else if (verdict === "unused") unused += item.size;
-    }
-    return { junk, unused };
+    return state.stack.length === 0 ? state.scan.items[state.selected] : state.children;
   }
 
   /** Size of whatever the detail pane is looking at. */

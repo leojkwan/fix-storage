@@ -1,0 +1,7 @@
+time	path	result	detail	df_delta_bytes
+1767268800.0	/fixture/one	REMOVING	fixture start	0
+1767268801.0	/fixture/one	REMOVED	fixture done	300000000
+1767268802.0	/fixture/two	SKIP	fixture busy	0
+1767268803.0	/fixture/three	REMOVING	fixture start	0
+1767268804.0	/fixture/three	REMOVED	fixture done	-50000000
+1767268805.0	TOTAL	DONE	fixture total	1500000000

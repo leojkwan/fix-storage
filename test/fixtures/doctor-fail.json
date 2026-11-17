@@ -1,0 +1,15 @@
+{
+  "schema": "disk-clean.doctor/1",
+  "measured_at": "2026-01-02T03:04:05Z",
+  "free": { "gib": 42.5, "floor_gib": 50, "target_gib": 100, "gap_gib": 57.5, "state": "below_floor", "source": "fixture" },
+  "producers": [
+    { "id": "p-floor", "name": "Free space floor", "kind": "floor", "value": 42.5, "limit": 50, "state": "fail", "owner": "Team A", "ticket": "T-101", "route": "self", "fix": "run the fixture reaper" },
+    { "id": "p-target", "name": "Free space target", "kind": "target", "value": 42.5, "limit": 100, "state": "gap", "owner": "Team A", "ticket": "T-102", "route": "self", "fix": "retire fixture folders" },
+    { "id": "p-setting", "name": "Fixture setting", "kind": "setting", "value": "on", "limit": null, "state": "ok", "owner": "Team A", "ticket": "T-103", "route": "self", "fix": "none" },
+    { "id": "p-build", "name": "Fixture build output", "kind": "count", "value": 7, "limit": 2, "state": "fail", "owner": "Team B", "ticket": "T-201", "route": "reap", "fix": "reap idle fixture output" },
+    { "id": "p-cache", "name": "Fixture cache", "kind": "count", "value": 1, "limit": 3, "state": "ok", "owner": "Team B", "ticket": "T-202", "route": "owner", "fix": "none" }
+  ],
+  "failing": 2,
+  "unknown": 0,
+  "healthy": false
+}

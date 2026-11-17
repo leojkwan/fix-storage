@@ -13,12 +13,12 @@ import { MAX_ROWS, type AppState, type Store } from "./store";
 // Everything is one monospace face at one size, like the rest of the terminal.
 // Hierarchy comes from color and weight only. No borders, no panels.
 
-const BG: Rgb = [0, 0, 0];
-const FG: Color = "#e6e6e6";
-const MUTED: Color = "#8c8c8c";
-const FAINT: Color = "#4f4f4f";
-const GREEN: Color = "#4ade80";
-const AMBER: Color = "#fbbf24";
+export const BG: Rgb = [0, 0, 0];
+export const FG: Color = "#e6e6e6";
+export const MUTED: Color = "#8c8c8c";
+export const FAINT: Color = "#4f4f4f";
+export const GREEN: Color = "#4ade80";
+export const AMBER: Color = "#fbbf24";
 
 const TIER_COLOR: Record<Tier, Color> = { safe: GREEN, review: AMBER, keep: MUTED };
 
@@ -30,13 +30,13 @@ const VERDICT: Record<Verdict, { color: Rgb; text: Color; tag: string }> = {
 };
 
 /** Width of n monospace characters. Text drops trailing spaces, so columns get real widths instead of padEnd. */
-const ch = (fs: number, n: number) => fs * 0.6 * n;
+export const ch = (fs: number, n: number) => fs * 0.6 * n;
 
 /** macOS puts a narrow no-break space before AM/PM in screenshot names; many fonts draw it as a box. */
 const clean = (name: string) => name.replace(/[\u202f\u00a0]/g, " ");
 
 const pct = (part: number, whole: number) => (whole > 0 ? `${Math.round((part / whole) * 100)}%` : "0%");
-const rgba = (c: Rgb, a: number): Color => [c[0], c[1], c[2], Math.round(Math.max(0, Math.min(1, a)) * 255)] as unknown as Color;
+export const rgba = (c: Rgb, a: number): Color => [c[0], c[1], c[2], Math.round(Math.max(0, Math.min(1, a)) * 255)] as unknown as Color;
 
 interface Ctx {
   state: AppState;
@@ -46,7 +46,7 @@ interface Ctx {
 }
 
 /** A run of monospace text. Everything on screen is built from these. */
-function T({
+export function T({
   children,
   fs,
   color = FG,
@@ -82,7 +82,7 @@ function T({
 }
 
 /** "key label", the way terminal tools print their shortcuts. Clickable. */
-function Hint({ k, label, fs, color = MUTED, keyColor = FG, onClick }: { k: string; label: string; fs: number; color?: Color; keyColor?: Color; onClick?: () => void }) {
+export function Hint({ k, label, fs, color = MUTED, keyColor = FG, onClick }: { k: string; label: string; fs: number; color?: Color; keyColor?: Color; onClick?: () => void }) {
   return (
     <Box style={{ flexShrink: 0, pointerShape: onClick ? "pointer" : "default" }} onClick={onClick}>
       <T fs={fs} color={keyColor} bold>
@@ -107,7 +107,7 @@ function hash(a: number, b: number): number {
  * A small dot-matrix bar, the same pixel language as the big meter: lit dots
  * in the category color with the odd white one, unlit dots for the rest.
  */
-function Dots({ fraction, color, count, fs, seed, rows = 1, dim = false }: { fraction: number; color: Rgb; count: number; fs: number; seed: number; rows?: number; dim?: boolean }) {
+export function Dots({ fraction, color, count, fs, seed, rows = 1, dim = false }: { fraction: number; color: Rgb; count: number; fs: number; seed: number; rows?: number; dim?: boolean }) {
   const dot = Math.max(2, Math.round(fs * 0.26));
   const gap = Math.max(1, Math.round(fs * 0.14));
   const lit = fraction > 0 ? Math.max(1, Math.round(fraction * count)) : 0;
@@ -236,7 +236,7 @@ function TopLine({ state, store, fs }: Ctx) {
   );
 }
 
-function Sep({ fs }: { fs: number }) {
+export function Sep({ fs }: { fs: number }) {
   return (
     <T fs={fs} color={FAINT} style={{ margin: { left: ch(fs, 3), right: ch(fs, 3) } }}>
       ·
@@ -354,39 +354,6 @@ function InsideHeader(ctx: Ctx) {
           {top ? tilde(top.path) : category.blurb}
         </T>
       </Box>
-      <Reclaimable {...ctx} />
-    </Box>
-  );
-}
-
-/** One line: how much of what is listed here looks like junk, and the filter to see only that. */
-function Reclaimable({ state, store, fs }: Ctx) {
-  const { junk, unused } = store.reclaimable();
-  if (junk + unused < 1e6 && !state.junkOnly) return null;
-  return (
-    <Box style={{ justifyContent: "space-between", gap: fs * 2, margin: { top: fs * 0.3 } }}>
-      <Box style={{ flexShrink: 1 }}>
-        {junk >= 1e6 ? (
-          <>
-            <T fs={fs} color={GREEN} bold>{size(junk)}</T>
-            <T fs={fs} color={MUTED} style={{ margin: { left: ch(fs, 1) } }}>junk</T>
-          </>
-        ) : null}
-        {junk >= 1e6 && unused >= 1e6 ? <Sep fs={fs} /> : null}
-        {unused >= 1e6 ? (
-          <>
-            <T fs={fs} color={AMBER} bold>{size(unused)}</T>
-            <T fs={fs} color={MUTED} style={{ margin: { left: ch(fs, 1) } }}>probably unused</T>
-          </>
-        ) : null}
-      </Box>
-      <Hint
-        fs={fs}
-        k="f"
-        label={state.junkOnly ? "show everything" : "show only junk & unused"}
-        keyColor={state.junkOnly ? AMBER : FG}
-        onClick={() => store.toggleJunkOnly()}
-      />
     </Box>
   );
 }
@@ -434,7 +401,7 @@ function ItemLine({ item, index, max, rowRef, ...ctx }: Ctx & { item: Item; inde
       <T fs={fs} color={selected ? FG : MUTED}>{size(item.size).padStart(8)}</T>
       <Dots fraction={item.size / Math.max(1, max)} color={label.verdict === "yours" ? category.color : verdict.color} count={DOTS} fs={fs} seed={index + 3} dim={label.verdict === "yours" && !selected} />
       <T fs={fs} color={FAINT}>{pct(item.size, store.scopeSize()).padStart(4)}</T>
-      <T fs={fs} color={used && Date.now() - used.at > 180 * 864e5 ? AMBER : FAINT}>{(used ? shortAge(Date.now() - used.at) : "").padStart(6)}</T>
+      <T fs={fs} color={FAINT}>{(used ? shortAge(Date.now() - used.at) : "").padStart(6)}</T>
     </Box>
   );
 }
@@ -503,7 +470,6 @@ function Empty({ state, store, fs }: Ctx) {
   const id = state.selected;
   let text: string;
   if (state.listing) text = "measuring what is inside…";
-  else if (state.junkOnly) text = "nothing here looks like junk · f to show everything";
   else if (state.scan.phase === "scanning" && state.stack.length === 0) text = "still measuring…";
   else if (id === "system") text = "macOS itself, snapshots, swap and anything this scan could not read. macOS manages it.";
   else if (state.stack.length > 0) text = "empty, or could not be read";
@@ -533,7 +499,7 @@ function Inside(ctx: Ctx) {
       <InsideHeader {...ctx} />
       <Box style={{ gap: fs * 0.6, margin: { top: fs * 0.7, bottom: fs * 0.2 }, flexShrink: 0 }}>
         <T fs={fs} color={state.pane === "list" ? MUTED : FAINT} style={{ flexGrow: 1, margin: { left: ch(fs, 2) } }}>
-          {`${all.length} ${all.length === 1 ? "item" : "items"}${state.junkOnly ? " labelled junk or unused" : ""}${state.listing ? " · measuring" : ""}`}
+          {`${all.length} ${all.length === 1 ? "item" : "items"}${state.listing ? " · measuring" : ""}`}
         </T>
         <T fs={fs} color={FAINT}>{"last used".padStart(10)}</T>
       </Box>
@@ -565,8 +531,8 @@ function Inside(ctx: Ctx) {
 function BottomLine({ state, fs }: Ctx) {
   const keys: Array<[string, string]> =
     state.pane === "list"
-      ? [["↑↓", "move"], ["→", "open"], ["←", "back"], ["g", "culprit"], ["f", "junk only"], ["o", "reveal"], ["q", "quit"]]
-      : [["↑↓", "category"], ["→", "look inside"], ["f", "junk only"], ["r", "rescan"], ["q", "quit"]];
+      ? [["↑↓", "move"], ["→", "open"], ["←", "back"], ["g", "culprit"], ["o", "reveal"], ["q", "quit"]]
+      : [["↑↓", "category"], ["→", "look inside"], ["r", "rescan"], ["q", "quit"]];
   return (
     <Box style={{ justifyContent: "space-between", gap: fs * 2, flexShrink: 0 }}>
       <Box style={{ gap: fs * 1.4, flexShrink: 0 }}>

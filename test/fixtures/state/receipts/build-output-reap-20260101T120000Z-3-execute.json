@@ -1,0 +1,15 @@
+{
+  "schema": "disk-clean.reap/1",
+  "tool": "build-output-reap",
+  "mode": "execute",
+  "state": "lock-timeout",
+  "refusal": "fixture lock not acquired",
+  "started_at": "2026-01-01T12:00:00Z",
+  "finished_at": "2026-01-01T12:00:01Z",
+  "free_start_bytes": 10000000000,
+  "free_end_bytes": 9990000000,
+  "freed_total_bytes": -10000000,
+  "items": [],
+  "kept_counts": {},
+  "stranded": []
+}

@@ -4,6 +4,15 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+### Added
+
+- Producers screen, the new default: free space against a floor and a target, failing producers by owner, and disk-clean receipts with df-measured freed space. Plans are never counted as freed. `--plain` and `--json` print the same summary.
+- `--scan` opens the folder browser, which is no longer the default because it runs `du`.
+
+### Changed
+
+- The folder browser no longer has a junk-only filter or a reclaimable total, and last-opened age is shown as a fact rather than turned into an "unused" label.
+
 ### Fixed
 
 - The installer now checks the downloaded package against the release's published `.sha256` and stops on a mismatch.

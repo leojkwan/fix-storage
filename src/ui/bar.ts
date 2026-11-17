@@ -7,6 +7,13 @@ export interface Segment {
   fraction: number;
 }
 
+/** A thin upright line at a fixed share of the bar, e.g. a free-space floor. */
+export interface Mark {
+  /** Share of the whole bar from the left, 0..1. */
+  fraction: number;
+  color: Rgb;
+}
+
 export interface BarModel {
   segments: Segment[];
   /** Segment to light up; the others dim. */
@@ -15,6 +22,8 @@ export interface BarModel {
   scanning: boolean;
   /** Segment being deleted; it sheds particles as it shrinks. */
   clearing: string | null;
+  /** Lines drawn over the bar, such as a floor and a target. */
+  marks?: Mark[];
 }
 
 export interface Presenter {
@@ -303,6 +312,15 @@ export class BarCanvas {
         } else {
           this.dot(cx, cy, radius, WHITE, Math.min(1, 0.95 * twinkle * level), 0.22 * twinkle * Math.min(1, level));
         }
+      }
+    }
+
+    const line = Math.max(2, Math.round(cell / 4));
+    for (const mark of this.model.marks ?? []) {
+      const mx = Math.round(Math.max(0, Math.min(1, mark.fraction)) * width - line / 2);
+      const my = Math.max(0, top - cell * 1.5);
+      for (let y = Math.floor(my); y < height; y++) {
+        for (let dx = 0; dx < line; dx++) this.blend(mx + dx, y, mark.color, 0.95);
       }
     }
 
