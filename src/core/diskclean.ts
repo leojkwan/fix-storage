@@ -416,7 +416,7 @@ export function demoReceipts(): Receipt[] {
   const r = (hoursAgo: number, rest: Omit<Receipt, "at">): Receipt => ({ ...rest, at: DEMO_NOW - hoursAgo * HOUR });
   return sortReceipts([
     r(1, { id: "demo-reap-4-plan", tool: "build-output-reap", mode: "plan", state: "complete", refusal: null, freedBytes: null, counts: { "would-remove": 5 } }),
-    r(3, { id: "demo-reap-3-execute", tool: "build-output-reap", mode: "execute", state: "lock-timeout", refusal: "demo lock was busy", freedBytes: -0.05 * GIB, counts: {} }),
+    r(3, { id: "demo-reap-3-execute", tool: "build-output-reap", mode: "execute", state: "lock-timeout", refusal: "demo lock was busy", freedBytes: null, counts: {} }),
     r(5, { id: "demo-worktree-2", tool: "worktree", mode: "execute", state: "done", refusal: null, freedBytes: 12.6 * GIB, counts: { removed: 18, skip: 7 } }),
     r(26, { id: "demo-reap-2-execute", tool: "build-output-reap", mode: "execute", state: "complete", refusal: null, freedBytes: 8.2 * GIB, counts: { removed: 6 } }),
     r(26.1, { id: "demo-reap-1-plan", tool: "build-output-reap", mode: "plan", state: "complete", refusal: null, freedBytes: null, counts: { "would-remove": 6 } }),
