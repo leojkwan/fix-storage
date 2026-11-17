@@ -501,7 +501,7 @@ function Inside(ctx: Ctx) {
         <T fs={fs} color={state.pane === "list" ? MUTED : FAINT} style={{ flexGrow: 1, margin: { left: ch(fs, 2) } }}>
           {`${all.length} ${all.length === 1 ? "item" : "items"}${state.listing ? " · measuring" : ""}`}
         </T>
-        <T fs={fs} color={FAINT}>{"last opened".padStart(12)}</T>
+        <T fs={fs} color={FAINT}>{"last used".padStart(10)}</T>
       </Box>
       {entries.length === 0 ? (
         <Empty {...ctx} />
